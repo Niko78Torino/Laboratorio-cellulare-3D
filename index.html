@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratorio Cellulare 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            background-color: #111827; /* bg-gray-900 */
+        }
+        #container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .control-panel {
+            scrollbar-width: thin;
+            scrollbar-color: #4B5563 #1F2937;
+        }
+        .control-panel::-webkit-scrollbar { width: 8px; }
+        .control-panel::-webkit-scrollbar-track { background: #1F2937; }
+        .control-panel::-webkit-scrollbar-thumb {
+            background-color: #4B5563;
+            border-radius: 10px;
+            border: 2px solid #1F2937;
+        }
+        #notification, #tooltip {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        }
+        #tooltip {
+            position: absolute;
+            background-color: rgba(17, 24, 39, 0.9); /* bg-gray-900 with opacity */
+            color: #D1D5DB; /* text-gray-300 */
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #374151; /* border-gray-700 */
+            font-size: 14px;
+            pointer-events: none; /* Prevents tooltip from blocking mouse events */
+            max-width: 250px;
+            z-index: 100;
+        }
+        .modal-close-btn-icon {
+            font-size: 1.5rem;
+            line-height: 1rem;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="text-white">
+
+    <div class="flex flex-col md:flex-row h-screen">
+        <!-- Pannello di Controllo Sinistro -->
+        <div class="w-full md:w-96 bg-gray-800 p-4 shadow-lg flex-shrink-0 flex flex-col control-panel overflow-y-auto">
+            <div class="space-y-6">
+                <div>
+                    <h1 class="text-2xl font-bold text-teal-400">Laboratorio Cellulare 3D</h1>
+                    <p class="text-sm text-gray-400">Simulatore di Patologie e Terapie</p>
+                </div>
+                
+                <div class="bg-gray-900 p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-2 text-teal-300">Descrizione</h2>
+                    <p class="text-sm text-gray-400">
+                        Questo simulatore permette di esplorare un modello 3D di una cellula umana, innescare scenari patologici e applicare terapie per osservarne le conseguenze.
+                    </p>
+                </div>
+
+                <div class="bg-gray-900 p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-3 border-b border-gray-700 pb-2">Scenari Patologici</h2>
+                    <p class="text-xs text-gray-500 mb-3">Seleziona uno scenario per alterare lo stato della cellula.</p>
+                    <div class="space-y-2">
+                         <button id="trigger-cancer-btn" class="w-full bg-red-600 hover:bg-red-500 font-bold py-2 px-4 rounded-md transition-colors duration-200">Innesca Mutazione (Cancro)</button>
+                         <button id="trigger-degen-btn" class="w-full bg-sky-600 hover:bg-sky-500 font-bold py-2 px-4 rounded-md transition-colors duration-200">Introduci Proteine Difettose</button>
+                         <button id="trigger-virus-btn" class="w-full bg-purple-600 hover:bg-purple-500 font-bold py-2 px-4 rounded-md transition-colors duration-200">Innesca Infezione Virale</button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-900 p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-3 border-b border-gray-700 pb-2">Scenari Terapeutici</h2>
+                     <p class="text-xs text-gray-500 mb-3">Applica una terapia per contrastare la patologia in corso.</p>
+                    <div class="space-y-2">
+                        <button id="trigger-chemo-btn" class="w-full bg-orange-600 hover:bg-orange-500 font-bold py-2 px-4 rounded-md transition-colors duration-200" disabled>Avvia Chemioterapia</button>
+                        <button id="trigger-clearance-btn" class="w-full bg-cyan-600 hover:bg-cyan-500 font-bold py-2 px-4 rounded-md transition-colors duration-200" disabled>Avvia Pulizia Proteica</button>
+                        <button id="trigger-antiviral-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 font-bold py-2 px-4 rounded-md transition-colors duration-200" disabled>Somministra Antivirale</button>
+                    </div>
+                </div>
+                
+                 <div class="bg-gray-900 p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-3 border-b border-gray-700 pb-2">Controlli e Reset</h2>
+                    <ul class="text-sm text-gray-400 list-disc list-inside space-y-1 mb-4">
+                        <li><span class="font-bold">Ruota:</span> Tasto sinistro + trascina.</li>
+                        <li><span class="font-bold">Zoom:</span> Rotellina del mouse.</li>
+                        <li><span class="font-bold">Sposta:</span> Tasto destro + trascina.</li>
+                    </ul>
+                    <button id="reset-cell-btn" class="w-full bg-gray-600 hover:bg-gray-500 font-bold py-2 px-4 rounded-md transition-colors duration-200">Reset Simulazione</button>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="mt-auto pt-4 border-t border-gray-700 text-center text-xs text-gray-500">
+                <p>&copy; Nicola Nicolaci 2025 - Laboratorio Didattico</p>
+                <div class="mt-2">
+                    <a href="#" id="disclaimer-link" class="underline hover:text-gray-300">Disclaimer</a> | 
+                    <a href="#" id="privacy-link" class="underline hover:text-gray-300">Privacy Policy</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-grow relative">
+            <div id="container" class="w-full h-full"></div>
+            <div class="absolute bottom-4 left-4 bg-gray-900 bg-opacity-80 p-4 rounded-lg shadow-lg max-w-sm">
+                <h3 class="text-lg font-bold text-teal-400">Stato della Cellula</h3>
+                <p class="font-mono text-gray-300"><span class="font-semibold">Condizione:</span> <span id="cell-status" class="font-bold">Sana</span></p>
+                <p class="font-mono text-gray-300"><span class="font-semibold">Divisioni Anomale:</span> <span id="cell-divisions">0</span></p>
+                <p class="font-mono text-gray-300"><span class="font-semibold">Placche Proteiche:</span> <span id="protein-plaques">0</span></p>
+                <p class="font-mono text-gray-300"><span class="font-semibold">Particelle Virali:</span> <span id="virus-particles">0</span></p>
+            </div>
+             <div id="notification" class="absolute top-4 right-4 bg-green-500 text-white p-3 rounded-lg shadow-lg text-sm font-semibold hidden opacity-0 transform translate-y-[-20px]"></div>
+        </div>
+    </div>
+    
+    <div id="tooltip" class="hidden opacity-0"></div>
+
+    <!-- Modals -->
+    <div id="disclaimer-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 max-w-2xl w-full text-gray-300 relative">
+            <h2 class="text-xl font-bold mb-4 text-teal-400">Disclaimer</h2>
+            <p class="text-sm mb-4">Questo simulatore è stato sviluppato esclusivamente per scopi didattici e dimostrativi. Le rappresentazioni della cellula e delle patologie sono semplificazioni e non devono essere considerate medicalmente accurate. L'autore non si assume alcuna responsabilità per conclusioni o decisioni basate sull'uso di questo strumento.</p>
+            <button class="modal-close-btn absolute top-2 right-3 text-gray-400 hover:text-white"><span class="modal-close-btn-icon">&times;</span></button>
+            <button class="modal-close-btn bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-4 rounded mt-4">Chiudi</button>
+        </div>
+    </div>
+
+    <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 max-w-2xl w-full text-gray-300 relative">
+            <h2 class="text-xl font-bold mb-4 text-teal-400">Privacy Policy</h2>
+            <p class="text-sm mb-4">Questo laboratorio cellulare 3D è un'applicazione stand-alone che viene eseguita interamente nel tuo browser. Non raccoglie, salva o trasmette alcun dato personale o di utilizzo. Tutte le interazioni avvengono localmente sul tuo dispositivo e non vengono memorizzate in alcun modo dopo la chiusura della sessione.</p>
+            <button class="modal-close-btn absolute top-2 right-3 text-gray-400 hover:text-white"><span class="modal-close-btn-icon">&times;</span></button>
+            <button class="modal-close-btn bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-4 rounded mt-4">Chiudi</button>
+        </div>
+    </div>
+
+
+    <script>
+        let scene, camera, renderer, controls, raycaster, mouse;
+        let cellGroup = new THREE.Group();
+        let organelleMeshes = [];
+        let viruses = [];
+        let cancerClones = [];
+        let therapyParticles = [];
+
+        let infectionTimeline = null;
+        let cancerTimeline = null;
+        let degenTimeline = null;
+        let therapyTimeline = null;
+
+        let intersectedObject = null;
+        let hideTooltipTimeout;
+        
+        const tooltip = document.getElementById('tooltip');
+        const tooltipContent = {
+            'Membrana': 'La membrana cellulare. Un involucro semi-permeabile che protegge la cellula e regola il passaggio di sostanze.',
+            'Nucleo': 'Il nucleo. Contiene il materiale genetico (DNA) e agisce come il centro di controllo della cellula.',
+            'Mitocondrio': 'Un mitocondrio. Considerato la "centrale energetica" della cellula, è responsabile della produzione di ATP.',
+            'Placca': 'Placca proteica. Un accumulo anomalo di proteine difettose, tossico per la cellula e associato a malattie neurodegenerative.',
+            'Virus': 'Una particella virale. Un agente infettivo che si replica solo all\'interno delle cellule viventi di altri organismi.',
+            'trigger-cancer-btn': 'Simula un processo tumorale a più fasi: una mutazione iniziale, seguita da una rapida e incontrollata divisione cellulare (proliferazione) e infine la diffusione di una cellula metastatica.',
+            'trigger-degen-btn': 'Simula una malattia degenerativa: le proteine si aggregano in placche, causando stress e danno agli organelli, fino a innescare la morte cellulare programmata (apoptosi).',
+            'trigger-virus-btn': 'Innesca un\'infezione virale. Un virus si legherà alla cellula, inietterà il suo materiale genetico e la userà per replicarsi, portando alla sua distruzione.',
+            'trigger-chemo-btn': 'Avvia una chemioterapia. Particelle farmacologiche attaccheranno le cellule a rapida divisione, distruggendo sia le cellule tumorali che quelle sane.',
+            'trigger-clearance-btn': 'Attiva una terapia sperimentale che usa "nanomacchine" per rimuovere le placche proteiche tossiche, permettendo alla cellula di guarire.',
+            'trigger-antiviral-btn': 'Somministra un farmaco che blocca la replicazione virale all\'interno della cellula, prevenendone la distruzione se usato in tempo.',
+            'reset-cell-btn': 'Riporta la cellula al suo stato originale sano, eliminando tutte le alterazioni patologiche e terapeutiche simulate.'
+        };
+
+        function init() {
+            const container = document.getElementById('container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111827);
+            
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.z = 15;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            scene.add(new THREE.AmbientLight(0xcccccc, 0.6));
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 5, 10);
+            scene.add(directionalLight);
+            
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            scene.add(cellGroup);
+
+            // --- Event Listeners ---
+            window.addEventListener('resize', onWindowResize);
+            container.addEventListener('mousemove', onMouseMove);
+            
+            document.getElementById('trigger-cancer-btn').addEventListener('click', triggerCancer);
+            document.getElementById('trigger-degen-btn').addEventListener('click', triggerDegenerativeDisease);
+            document.getElementById('trigger-virus-btn').addEventListener('click', triggerViralInfection);
+            document.getElementById('reset-cell-btn').addEventListener('click', createHealthyCell);
+            document.getElementById('trigger-chemo-btn').addEventListener('click', triggerChemotherapy);
+            document.getElementById('trigger-clearance-btn').addEventListener('click', triggerProteinClearance);
+            document.getElementById('trigger-antiviral-btn').addEventListener('click', triggerAntiviral);
+
+            const allButtons = ['trigger-cancer-btn', 'trigger-degen-btn', 'trigger-virus-btn', 'reset-cell-btn', 'trigger-chemo-btn', 'trigger-clearance-btn', 'trigger-antiviral-btn'];
+            allButtons.forEach(id => {
+                const btn = document.getElementById(id);
+                btn.addEventListener('mouseenter', () => showButtonTooltip(btn, tooltipContent[id]));
+                btn.addEventListener('mouseleave', hideTooltip);
+            });
+            
+            // --- Modal Logic ---
+            setupModal('disclaimer-link', 'disclaimer-modal');
+            setupModal('privacy-link', 'privacy-modal');
+            
+            createHealthyCell();
+            animate();
+        }
+
+        function setupModal(linkId, modalId) {
+            const modal = document.getElementById(modalId);
+            document.getElementById(linkId).addEventListener('click', (e) => {
+                e.preventDefault();
+                modal.classList.remove('hidden');
+            });
+            modal.querySelectorAll('.modal-close-btn').forEach(btn => {
+                btn.addEventListener('click', () => modal.classList.add('hidden'));
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) modal.classList.add('hidden');
+            });
+        }
+        
+        function createHealthyCell() {
+            // Stop all ongoing timelines
+            if (infectionTimeline) { infectionTimeline.kill(); infectionTimeline = null; }
+            if (cancerTimeline) { cancerTimeline.kill(); cancerTimeline = null; }
+            if (degenTimeline) { degenTimeline.kill(); degenTimeline = null; }
+            if (therapyTimeline) { therapyTimeline.kill(); therapyTimeline = null; }
+
+            // Clean up all dynamic objects
+            viruses.forEach(v => scene.remove(v));
+            viruses = [];
+            cancerClones.forEach(c => scene.remove(c));
+            cancerClones = [];
+            therapyParticles.forEach(p => scene.remove(p));
+            therapyParticles = [];
+            
+            while(cellGroup.children.length > 0){ cellGroup.remove(cellGroup.children[0]); }
+            organelleMeshes = [];
+            
+            updateInfoPanel('Sana', 0, 0, 0);
+
+            // Reset UI
+            document.getElementById('trigger-chemo-btn').disabled = true;
+            document.getElementById('trigger-clearance-btn').disabled = true;
+            document.getElementById('trigger-antiviral-btn').disabled = true;
+            
+            cellGroup.scale.set(1,1,1);
+
+            const membrane = createOrganelle('Membrana', 0x00A0A0, 5, new THREE.Vector3(0,0,0), {transparent: true, opacity: 0.2});
+            cellGroup.add(membrane);
+
+            const nucleus = createOrganelle('Nucleo', 0x8A2BE2, 2, new THREE.Vector3(0, 0, 0));
+            cellGroup.add(nucleus);
+            organelleMeshes.push(nucleus);
+
+            for(let i=0; i<8; i++){
+                const position = new THREE.Vector3( (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6 );
+                if(position.length() > 2.5 && position.length() < 4.5){
+                    const mitochondrion = createOrganelle('Mitocondrio', 0xFF4500, 0.5, position);
+                    cellGroup.add(mitochondrion);
+                    organelleMeshes.push(mitochondrion);
+                }
+            }
+            showNotification("Simulazione resettata. Cellula sana creata.", "bg-green-500");
+        }
+
+        function createOrganelle(name, color, size, position, materialProps = {}){
+            const geometry = new THREE.SphereGeometry(size, 32, 32);
+            const material = new THREE.MeshPhongMaterial({ color: color, shininess: 50, ...materialProps });
+            const organelle = new THREE.Mesh(geometry, material);
+            organelle.position.copy(position);
+            organelle.name = name;
+            return organelle;
+        }
+
+        function createVirus(position) { /* ... same as before ... */
+            const virusGroup = new THREE.Group();
+            const capsidGeometry = new THREE.IcosahedronGeometry(0.3, 1);
+            const capsidMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00, shininess: 80 });
+            const capsid = new THREE.Mesh(capsidGeometry, capsidMaterial);
+            virusGroup.add(capsid);
+            const spikeGeometry = new THREE.ConeGeometry(0.05, 0.2, 8);
+            const spikeMaterial = new THREE.MeshPhongMaterial({ color: 0xff00ff });
+            const vertices = capsidGeometry.attributes.position;
+            const uniqueVertices = new Map();
+            for (let i = 0; i < vertices.count; i++) {
+                const key = [vertices.getX(i), vertices.getY(i), vertices.getZ(i)].map(v => v.toFixed(4)).join(',');
+                if (!uniqueVertices.has(key)) {
+                    uniqueVertices.set(key, new THREE.Vector3(vertices.getX(i), vertices.getY(i), vertices.getZ(i)));
+                }
+            }
+            uniqueVertices.forEach(vertex => {
+                const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+                const pos = vertex.clone().normalize().multiplyScalar(0.3);
+                spike.position.copy(pos);
+                spike.lookAt(new THREE.Vector3(0,0,0));
+                spike.rotateX(Math.PI / 2);
+                virusGroup.add(spike);
+            });
+            virusGroup.position.copy(position);
+            virusGroup.name = 'Virus';
+            const boundingMesh = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+            boundingMesh.name = 'Virus';
+            virusGroup.add(boundingMesh);
+            return virusGroup;
+        }
+
+        function createTumorCell(position) { /* ... same as before ... */
+            const cloneGroup = new THREE.Group();
+            const membrane = createOrganelle('Membrana', 0x00A0A0, 5, new THREE.Vector3(0,0,0), {transparent: true, opacity: 0.1});
+            cloneGroup.add(membrane);
+            const nucleus = createOrganelle('Nucleo', 0xff0000, 2.2, new THREE.Vector3(0, 0, 0)); // Red, larger nucleus
+            cloneGroup.add(nucleus);
+            for(let i=0; i<4; i++){
+                const mitoPosition = new THREE.Vector3( (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6 );
+                if(mitoPosition.length() > 2.5 && mitoPosition.length() < 4.5){
+                    cloneGroup.add(createOrganelle('Mitocondrio', 0xFF4500, 0.5, mitoPosition));
+                }
+            }
+            cloneGroup.position.copy(position);
+            cloneGroup.scale.set(0.1, 0.1, 0.1);
+            gsap.to(cloneGroup.scale, {x: 1, y: 1, z: 1, duration: 2});
+            return cloneGroup;
+        }
+        
+        // --- Pathology Triggers ---
+        function triggerCancer() {
+            if (cancerTimeline || infectionTimeline || degenTimeline) {
+                showNotification("Una simulazione è già in corso. Resettare prima.", "bg-yellow-500");
+                return;
+            }
+            createHealthyCell();
+            
+            cancerTimeline = gsap.timeline({ onComplete: () => { cancerTimeline = null; } });
+            const nucleus = cellGroup.children.find(c => c.name === 'Nucleo');
+            
+            document.getElementById('trigger-chemo-btn').disabled = false;
+
+            // ... cancer simulation phases as before ...
+             // Fase 1: Mutazione
+            cancerTimeline.add(() => {
+                showNotification("Mutazione del DNA innescata!", "bg-red-500");
+                updateInfoPanel("Tumorale (Mutazione)", 0, 0, 0);
+                if (nucleus) gsap.to(nucleus.material.color, { r: 1, g: 0, b: 0, duration: 1 });
+            });
+            // Fase 2: Proliferazione
+            cancerTimeline.add(() => { updateInfoPanel("Tumorale (Proliferazione)", 1, 0, 0); }, "+=2");
+            for (let i = 1; i <= 4; i++) {
+                cancerTimeline.add(() => {
+                    const offset = new THREE.Vector3( (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 4 );
+                    const newClone = createTumorCell(offset);
+                    cancerClones.push(newClone);
+                    scene.add(newClone);
+                    updateInfoPanel(`Tumorale (Proliferazione)`, i + 1, 0, 0);
+                }, `+=${Math.random() * 1.5 + 1}`);
+            }
+            // Fase 3: Metastasi
+            cancerTimeline.add(() => {
+                if (cancerClones.length > 0) {
+                    updateInfoPanel("Tumorale (Metastasi)", cancerClones.length + 1, 0, 0);
+                    showNotification("Una cellula metastatica si è staccata!", "bg-red-700");
+                    const metastaticCell = cancerClones[0];
+                    gsap.to(metastaticCell.position, {
+                        x: metastaticCell.position.x + (Math.random() - 0.5) * 40,
+                        y: metastaticCell.position.y + (Math.random() - 0.5) * 40,
+                        z: metastaticCell.position.z + (Math.random() - 0.5) * 40,
+                        duration: 5, ease: "power2.in"
+                    });
+                }
+            }, "+=3");
+        }
+
+        function triggerDegenerativeDisease() {
+            if (cancerTimeline || infectionTimeline || degenTimeline) {
+                showNotification("Una simulazione è già in corso. Resettare prima.", "bg-yellow-500");
+                return;
+            }
+            createHealthyCell();
+            
+            degenTimeline = gsap.timeline({ onComplete: () => { degenTimeline = null; } });
+            document.getElementById('trigger-clearance-btn').disabled = false;
+
+            // ... degen simulation phases as before ...
+             degenTimeline.add(() => {
+                showNotification("Accumulo di proteine difettose iniziato.", "bg-sky-500");
+                updateInfoPanel("Degenerativa (Aggregazione)", 0, 5, 0);
+                for (let i = 0; i < 5; i++) {
+                    const position = new THREE.Vector3((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+                    if (position.length() < 4.8) {
+                        const plaque = createOrganelle('Placca', 0xFFFF00, 0.2, position);
+                        cellGroup.add(plaque);
+                        organelleMeshes.push(plaque);
+                    }
+                }
+            });
+            degenTimeline.add(() => {
+                showNotification("Le placche danneggiano gli organelli!", "bg-sky-700");
+                updateInfoPanel("Degenerativa (Stress Cellulare)", 0, 5, 0);
+                const mitochondria = cellGroup.children.filter(c => c.name === 'Mitocondrio');
+                mitochondria.forEach(mito => {
+                    gsap.to(mito.material.color, { r: 0.5, g: 0.2, b: 0.1, duration: 1.5 });
+                    gsap.to(mito.scale, { x: 0.7, y: 0.7, z: 0.7, duration: 1.5 });
+                });
+            }, "+=3");
+            degenTimeline.add(() => {
+                showNotification("La cellula avvia l'autodistruzione (apoptosi).", "bg-gray-700");
+                updateInfoPanel("Morta (Apoptosi)", 0, 5, 0);
+                gsap.to(cellGroup.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 3, ease: "power2.in" });
+                const membrane = cellGroup.children.find(c => c.name === 'Membrana');
+                if (membrane) gsap.to(membrane.material, { opacity: 0, duration: 3 });
+            }, "+=3");
+        }
+
+        function triggerViralInfection() {
+            if (cancerTimeline || infectionTimeline || degenTimeline) {
+                showNotification("Una simulazione è già in corso. Resettare prima.", "bg-yellow-500");
+                return;
+            }
+            createHealthyCell();
+            
+            const virus = createVirus(new THREE.Vector3(8, 8, 8));
+            scene.add(virus);
+            viruses.push(virus);
+            organelleMeshes.push(virus.children.find(c => c.name === 'Virus'));
+
+            updateInfoPanel('Infetta (Contatto)', 0, 0, 1);
+            showNotification("Infezione virale iniziata!", "bg-purple-500");
+
+            const nucleus = cellGroup.children.find(c => c.name === 'Nucleo');
+            const membrane = cellGroup.children.find(c => c.name === 'Membrana');
+            
+            document.getElementById('trigger-antiviral-btn').disabled = false;
+
+            infectionTimeline = gsap.timeline({ onComplete: () => { 
+                infectionTimeline = null;
+                document.getElementById('trigger-antiviral-btn').disabled = true;
+            }});
+
+            // ... virus simulation phases as before ...
+            infectionTimeline
+                .to(virus.position, { x: 4.5, y: 0, z: 0, duration: 4, ease: "power1.inOut", onUpdate: () => virus.lookAt(scene.position) })
+                .to(virus.scale, { x: 0.1, y: 0.1, z: 0.1, duration: 1, ease: "power1.in", onStart: () => updateInfoPanel('Infetta (Ingresso)', 0, 0, 1) })
+                .to(nucleus.material.color, { r: 0.2, g: 0.8, b: 0.2, duration: 2, ease: "power1.inOut",
+                    onStart: () => {
+                        scene.remove(virus);
+                        updateInfoPanel('Infetta (Replicazione)', 0, 0, '1 -> N');
+                    }
+                }, "-=0.5")
+                .to(membrane.material, { opacity: 0, duration: 2,
+                    onStart: () => {
+                        updateInfoPanel('Distrutta (Lisi)', 0, 0, '>10');
+                        for (let i = 0; i < 10; i++) {
+                            const newVirus = createVirus(new THREE.Vector3(0,0,0));
+                            scene.add(newVirus);
+                            viruses.push(newVirus);
+                            gsap.to(newVirus.position, {
+                                x: (Math.random() - 0.5) * 20, y: (Math.random() - 0.5) * 20, z: (Math.random() - 0.5) * 20,
+                                duration: 3, delay: Math.random() * 1.5
+                            });
+                        }
+                    }
+                });
+        }
+        
+        // --- Therapy Triggers ---
+        function triggerChemotherapy() {
+            if (cancerTimeline) cancerTimeline.kill();
+            showNotification("Chemioterapia avviata!", "bg-orange-500");
+            updateInfoPanel("In Chemioterapia", "N/A", 0, 0);
+            document.getElementById('trigger-chemo-btn').disabled = true;
+
+            const targets = [cellGroup, ...cancerClones];
+            targets.forEach(target => {
+                gsap.to(target.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 5, delay: Math.random() * 2, ease: "power2.in" });
+            });
+            therapyTimeline = gsap.delayedCall(7, () => {
+                updateInfoPanel("Remissione", 0,0,0);
+                showNotification("Trattamento completato.", "bg-green-500");
+            });
+        }
+
+        function triggerProteinClearance() {
+            if (degenTimeline) degenTimeline.kill();
+            showNotification("Terapia di pulizia proteica avviata!", "bg-cyan-500");
+            updateInfoPanel("In Terapia", 0, "N/A", 0);
+            document.getElementById('trigger-clearance-btn').disabled = true;
+
+            const plaques = cellGroup.children.filter(c => c.name === 'Placca');
+            plaques.forEach(plaque => {
+                gsap.to(plaque.scale, { x: 0.01, y: 0.01, z: 0.01, duration: 2, onComplete: () => cellGroup.remove(plaque) });
+            });
+            
+            therapyTimeline = gsap.delayedCall(2.5, () => {
+                const mitochondria = cellGroup.children.filter(c => c.name === 'Mitocondrio');
+                mitochondria.forEach(mito => {
+                    gsap.to(mito.material.color, { r: 1, g: 0.27, b: 0, duration: 1.5 });
+                    gsap.to(mito.scale, { x: 1, y: 1, z: 1, duration: 1.5 });
+                });
+                updateInfoPanel("Guarita", 0, 0, 0);
+                showNotification("Cellula recuperata con successo!", "bg-green-500");
+            });
+        }
+
+        function triggerAntiviral() {
+            if (!infectionTimeline || infectionTimeline.totalProgress() > 0.7) {
+                 showNotification("Troppo tardi! La cellula sta per essere distrutta.", "bg-red-500");
+                 return;
+            }
+            infectionTimeline.kill();
+            showNotification("Farmaco antivirale somministrato!", "bg-indigo-500");
+            updateInfoPanel("Salvata (Terapia)", 0, 0, 1);
+            document.getElementById('trigger-antiviral-btn').disabled = true;
+
+            const nucleus = cellGroup.children.find(c => c.name === 'Nucleo');
+            if (nucleus) {
+                 gsap.to(nucleus.material.color, { r: 0.54, g: 0.17, b: 0.89, duration: 2 }); // Return to purple
+            }
+        }
+        
+        // --- Core Functions (Mouse, Resize, Animate) ---
+        function onMouseMove(event) {
+            const container = document.getElementById('container');
+            const rect = container.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            tooltip.style.left = `${event.clientX + 15}px`;
+            tooltip.style.top = `${event.clientY + 15}px`;
+        }
+
+        function checkIntersections() {
+            raycaster.setFromCamera(mouse, camera);
+            const allMeshes = [...organelleMeshes, ...viruses.map(v => v.children.find(c => c.name === 'Virus')).filter(v => v)];
+            const intersects = raycaster.intersectObjects(allMeshes, true);
+
+            if (intersects.length > 0) {
+                 const firstIntersected = intersects[0].object;
+                 const parentObject = firstIntersected.name === 'Virus' ? firstIntersected : firstIntersected.parent && firstIntersected.parent.name === 'Virus' ? firstIntersected.parent : firstIntersected;
+                if (intersectedObject !== parentObject) {
+                    intersectedObject = parentObject;
+                    showTooltip(tooltipContent[intersectedObject.name]);
+                }
+            } else {
+                if (intersectedObject) { hideTooltip(); }
+                intersectedObject = null;
+            }
+        }
+        
+        function showTooltip(text) { /* ... same as before ... */
+            if(!text) return;
+            clearTimeout(hideTooltipTimeout);
+            tooltip.textContent = text;
+            tooltip.classList.remove('hidden', 'opacity-0');
+        }
+        
+        function hideTooltip() { /* ... same as before ... */
+            hideTooltipTimeout = setTimeout(() => {
+                tooltip.classList.add('opacity-0');
+                setTimeout(() => tooltip.classList.add('hidden'), 300);
+            }, 300);
+        }
+
+        function showButtonTooltip(button, text) { /* ... same as before ... */
+            clearTimeout(hideTooltipTimeout);
+            const rect = button.getBoundingClientRect();
+            tooltip.textContent = text;
+            tooltip.style.left = `${rect.left}px`;
+            tooltip.style.top = `${rect.bottom + 10}px`;
+            tooltip.classList.remove('hidden', 'opacity-0');
+        }
+        
+        function updateInfoPanel(status, divisions, plaques, virusCount) {
+            const statusEl = document.getElementById('cell-status');
+            statusEl.textContent = status;
+            document.getElementById('cell-divisions').textContent = divisions;
+            document.getElementById('protein-plaques').textContent = plaques;
+            document.getElementById('virus-particles').textContent = virusCount;
+            if(status.includes("Sana") || status.includes("Guarita") || status.includes("Salvata")) statusEl.className = "font-bold text-green-400";
+            else if(status.includes("Tumorale") || status.includes("Remissione")) statusEl.className = "font-bold text-red-400";
+            else if(status.includes("Degenerativa")) statusEl.className = "font-bold text-sky-400";
+            else if(status.includes("Infetta") || status.includes("Distrutta")) statusEl.className = "font-bold text-purple-400";
+            else if(status.includes("Morta")) statusEl.className = "font-bold text-gray-500";
+            else if(status.includes("Terapia") || status.includes("Chemioterapia")) statusEl.className = "font-bold text-orange-400";
+        }
+
+        function showNotification(message, bgColorClass) { /* ... same as before ... */
+            const notification = document.getElementById('notification');
+            if(!notification) return;
+            notification.textContent = message;
+            notification.className = `absolute top-4 right-4 text-white p-3 rounded-lg shadow-lg text-sm font-semibold opacity-0 transform translate-y-[-20px] ${bgColorClass}`;
+            requestAnimationFrame(() => notification.classList.remove('hidden', 'opacity-0', 'translate-y-[-20px]'));
+            setTimeout(() => {
+                notification.classList.add('opacity-0', 'translate-y-[-20px]');
+                setTimeout(() => notification.classList.add('hidden'), 300);
+            }, 3000);
+        }
+        function onWindowResize() { /* ... same as before ... */
+            const container = document.getElementById('container');
+            if(!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            checkIntersections();
+            renderer.render(scene, camera);
+        }
+        
+        const gsapScript = document.createElement('script');
+        gsapScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js';
+        gsapScript.onload = () => { init(); };
+        document.head.appendChild(gsapScript);
+
+    </script>
+</body>
+</html>
+
