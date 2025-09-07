@@ -27,7 +27,7 @@ Farmaco Antivirale: Durante un'infezione, somministra un farmaco che blocca la r
 Pannello di Stato Dinamico: Un'interfaccia aggiorna in tempo reale la condizione della cellula e i contatori chiave (es. divisioni anomale, placche), fornendo un feedback costante sulla simulazione in corso.
 
 Come Utilizzare il Laboratorio
-Aprire il File: Apri il file laboratorio_cellulare.html in un browser web moderno (come Chrome, Firefox, o Edge).
+Aprire il File: Apri il file https://laboratorio-cellulare-3d.netlify.app/ in un browser web moderno (come Chrome, Firefox, o Edge).
 
 Esplorare la Cellula Sana:
 
@@ -136,5 +136,6 @@ Autore e Licenza
 Autore: Nicola Nicolaci
 
 Anno: 2025
+
 
 Licenza: Copyright - Riservato per uso didattico.
